@@ -62,6 +62,12 @@ class VoterRegistrationSerializer(serializers.Serializer):
     password = serializers.CharField(min_length=6, write_only=True)
     confirm_password = serializers.CharField(min_length=6, write_only=True)
     
+    def validate_station_id(self, value):
+        from elections.models import VotingStation
+        if not VotingStation.objects.filter(pk=value, is_active=True).exists():
+            raise serializers.ValidationError("Invalid or inactive voting station.")
+        return value
+
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("A user with this email already exists.")

@@ -73,18 +73,19 @@ class VoteCastingService:
 
 class VoteHistoryService:
     def get_voter_history(self, voter):
-        voted_poll_ids = (
-            Vote.objects.filter(voter=voter)
-            .values_list("poll_id", flat=True)
-            .distinct()
-        )
-        polls = Poll.objects.filter(pk__in=voted_poll_ids)
+        from collections import defaultdict
+        all_votes = Vote.objects.filter(voter=voter).select_related(
+            "poll", "poll_position__position", "candidate"
+        ).order_by("-poll__created_at")
+
+        # Group votes by poll
+        poll_map = defaultdict(list)
+        for vote in all_votes:
+            poll_map[vote.poll].append(vote)
+
         history = []
-        for poll in polls:
+        for poll, votes in poll_map.items():
             positions = []
-            votes = Vote.objects.filter(voter=voter, poll=poll).select_related(
-                "poll_position__position", "candidate"
-            )
             for vote in votes:
                 positions.append({
                     "position_title": vote.poll_position.position.title,
