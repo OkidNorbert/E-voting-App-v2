@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.utils import timezone
 
 from audit.services import AuditService
 from elections.models import Candidate, Poll, PollPosition, Position, VotingStation
@@ -30,6 +31,8 @@ class CandidateService:
 
     def deactivate(self, candidate_id, deleted_by):
         candidate = Candidate.objects.get(pk=candidate_id)
+        if candidate.poll_positions.filter(poll__status=Poll.Status.OPEN).exists():
+            raise ValueError("Cannot deactivate a candidate in an open poll.")
         candidate.is_active = False
         candidate.save(update_fields=["is_active"])
         self._audit.log(
@@ -48,11 +51,13 @@ class CandidateService:
         if education := query_params.get("education"):
             qs = qs.filter(education=education)
         if min_age := query_params.get("min_age"):
-            qs = [c for c in qs if c.age >= int(min_age)]
-            return qs
+            today = timezone.now().date()
+            birth_year_limit = today.year - int(min_age)
+            qs = qs.filter(date_of_birth__year__lte=birth_year_limit)
         if max_age := query_params.get("max_age"):
-            qs = [c for c in qs if c.age <= int(max_age)]
-            return qs
+            today = timezone.now().date()
+            birth_year_limit = today.year - int(max_age)
+            qs = qs.filter(date_of_birth__year__gte=birth_year_limit)
         return qs
 
 
@@ -118,6 +123,8 @@ class PositionService:
 
     def deactivate(self, position_id, deleted_by):
         position = Position.objects.get(pk=position_id)
+        if position.poll_positions.filter(poll__status=Poll.Status.OPEN).exists():
+            raise ValueError("Cannot deactivate a position in an open poll.")
         position.is_active = False
         position.save(update_fields=["is_active"])
         self._audit.log(

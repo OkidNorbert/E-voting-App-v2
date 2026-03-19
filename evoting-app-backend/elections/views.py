@@ -3,8 +3,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsAdminOrReadOnlyVoter, IsAdminUser
-from elections.models import Candidate, Poll, Position, VotingStation
+from accounts.permissions import IsAdminOrReadOnlyVoter, IsAdminUser, IsAdminWriteUser
+from elections.models import Candidate, Poll, PollPosition, Position, VotingStation
 from elections.serializers import (
     AssignCandidatesSerializer,
     CandidateCreateSerializer,
@@ -58,7 +58,7 @@ class CandidateDetailView(generics.RetrieveUpdateAPIView):
 
 
 class CandidateDeactivateView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminWriteUser]
 
     def post(self, request, pk):
         service = CandidateService()
@@ -96,7 +96,7 @@ class VotingStationDetailView(generics.RetrieveUpdateAPIView):
 
 
 class VotingStationDeactivateView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminWriteUser]
 
     def post(self, request, pk):
         service = VotingStationService()
@@ -136,7 +136,7 @@ class PositionDetailView(generics.RetrieveUpdateAPIView):
 
 
 class PositionDeactivateView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminWriteUser]
 
     def post(self, request, pk):
         service = PositionService()
@@ -176,7 +176,7 @@ class PollDetailView(generics.RetrieveAPIView):
 
 
 class PollUpdateView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminWriteUser]
 
     def patch(self, request, pk):
         try:
@@ -196,7 +196,7 @@ class PollUpdateView(APIView):
 
 
 class PollDeleteView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminWriteUser]
 
     def delete(self, request, pk):
         service = PollService()
@@ -210,7 +210,7 @@ class PollDeleteView(APIView):
 
 
 class PollToggleStatusView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminWriteUser]
 
     def post(self, request, pk):
         action = request.data.get("action")
@@ -230,7 +230,7 @@ class PollToggleStatusView(APIView):
 
 
 class AssignCandidatesView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminWriteUser]
     serializer_class = AssignCandidatesSerializer
 
     def post(self, request):
@@ -243,8 +243,9 @@ class AssignCandidatesView(APIView):
                 serializer.validated_data["candidate_ids"],
                 request.user,
             )
-        except ValueError as e:
-            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except (ValueError, PollPosition.DoesNotExist) as e:
+            msg = str(e) if isinstance(e, ValueError) else "Poll position not found."
+            return Response({"detail": msg}, status=status.HTTP_400_BAD_REQUEST)
         return Response({
             "detail": f"Candidates assigned to {poll_position.position.title}.",
             "candidate_count": poll_position.candidates.count(),
