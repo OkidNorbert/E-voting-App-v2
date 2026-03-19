@@ -1,4 +1,4 @@
-from rest_framework import generics, status
+from rest_framework import generics, status, permissions
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -72,8 +72,12 @@ class CandidateDeactivateView(APIView):
 
 
 class VotingStationListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAdminOrReadOnlyVoter]
-    queryset = VotingStation.objects.all()
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [permissions.AllowAny()]
+        return [IsAdminOrReadOnlyVoter()]
+
+    queryset = VotingStation.objects.filter(is_active=True)
 
     def get_serializer_class(self):
         if self.request.method == "POST":
