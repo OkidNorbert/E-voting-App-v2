@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -5,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.permissions import IsAdminUser, IsSuperAdmin
+from accounts.permissions import IsAdminUser, IsAdminWriteUser, IsSuperAdmin
 from accounts.serializers import (
     AdminCreateSerializer,
     AdminListSerializer,
@@ -145,16 +146,19 @@ class VoterListView(generics.ListAPIView):
 
 
 class VoterVerifyView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminWriteUser]
 
     def post(self, request, pk):
-        service = VoterManagementService()
-        service.verify(pk, request.user)
+        try:
+            service = VoterManagementService()
+            service.verify(pk, request.user)
+        except User.DoesNotExist:
+            return Response({"detail": "Voter not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response({"detail": "Voter verified successfully."})
 
 
 class VoterVerifyAllView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminWriteUser]
 
     def post(self, request):
         service = VoterManagementService()
@@ -163,7 +167,7 @@ class VoterVerifyAllView(APIView):
 
 
 class VoterDeactivateView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminWriteUser]
 
     def post(self, request, pk):
         service = VoterManagementService()
