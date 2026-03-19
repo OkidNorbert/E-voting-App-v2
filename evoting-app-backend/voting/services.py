@@ -22,6 +22,9 @@ class VoteCastingService:
             "poll_positions__candidates", "stations"
         ).get(pk=poll_id)
 
+        if Vote.objects.filter(voter=voter, poll=poll).exists():
+            raise ValueError("You have already voted in this poll.")
+
         self._validate_poll_eligibility(voter, poll)
 
         created_votes = []
@@ -259,38 +262,48 @@ class StatisticsService:
 
     def get_voter_demographics(self):
         from accounts.models import VoterProfile
+        from django.db.models.functions import ExtractYear
+        from django.utils import timezone
 
-        profiles = VoterProfile.objects.select_related("user").filter(
-            user__role=User.Role.VOTER
-        )
+        profiles = VoterProfile.objects.filter(user__role=User.Role.VOTER)
 
-        gender_counts = (
+        gender_counts = list(
             profiles.values("gender")
             .annotate(count=Count("id"))
             .order_by("gender")
         )
 
-        age_groups = defaultdict(int)
-        for profile in profiles:
-            age = profile.age
+        today = timezone.now().date()
+        # Calculate age usingExtractYear and subtraction
+        age_qs = profiles.annotate(
+            birth_year=ExtractYear("date_of_birth")
+        ).values("birth_year").annotate(count=Count("id"))
+
+        age_groups = {
+            "under_18": 0, "18-25": 0, "26-35": 0, "36-45": 0,
+            "46-55": 0, "56-65": 0, "65+": 0
+        }
+
+        for item in age_qs:
+            age = today.year - item["birth_year"]
             if age < 18:
-                age_groups["under_18"] += 1
+                age_groups["under_18"] += item["count"]
             elif age <= 25:
-                age_groups["18-25"] += 1
+                age_groups["18-25"] += item["count"]
             elif age <= 35:
-                age_groups["26-35"] += 1
+                age_groups["26-35"] += item["count"]
             elif age <= 45:
-                age_groups["36-45"] += 1
+                age_groups["36-45"] += item["count"]
             elif age <= 55:
-                age_groups["46-55"] += 1
+                age_groups["46-55"] += item["count"]
             elif age <= 65:
-                age_groups["56-65"] += 1
+                age_groups["56-65"] += item["count"]
             else:
-                age_groups["65+"] += 1
+                age_groups["65+"] += item["count"]
 
         return {
-            "gender": list(gender_counts),
-            "age_groups": dict(age_groups),
+            "gender": gender_counts,
+            "age_groups": age_groups,
         }
 
     def get_station_load(self):
