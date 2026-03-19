@@ -12,7 +12,10 @@ class AuditService:
 
     @staticmethod
     def get_recent(limit=20):
-        return AuditLog.objects.all()[:limit]
+        qs = AuditLog.objects.all()
+        if limit is not None:
+            qs = qs[:limit]
+        return qs
 
     @staticmethod
     def filter_by_action(action_type):
